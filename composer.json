@@ -24,7 +24,6 @@
         "rakit/validation": "^1.4"
     },
     "scripts": {
-        "test": "vendor/bin/phpunit tests",
-        "test-coverage": "vendor/bin/phpunit /tests/*.php --coverage-html coverage"
+        "test": "vendor/bin/phpunit tests"
     }
 }

@@ -16,12 +16,25 @@ class BaseComment implements CommentInterface
         'text' => 'required'
     ];
 
+    /**
+     * @var int|null
+     */
     protected ?int $id = null;
 
+    /**
+     * @var string
+     */
     protected string $name;
 
+    /**
+     * @var string
+     */
     protected string $text;
 
+    /**
+     * @param array $commentData
+     * @throws CommentValidateException
+     */
     public function __construct(array $commentData)
     {
         if ($this->isValid($commentData) === false)
@@ -39,6 +52,7 @@ class BaseComment implements CommentInterface
     {
         return $this->id;
     }
+
 
     public function setId(int $id): void
     {

@@ -6,14 +6,33 @@ use CommentService\Exception\InvalidConfigException;
 
 class RouteConfig
 {
+    /**
+     * uri Обращения к серверу
+     * @var string
+     */
     protected string $uri;
 
+    /**
+     * Метод
+     * @var string
+     */
     protected string $requestMethod;
 
+    /**
+     * Хедеры только этого роута
+     * @var array
+     */
     protected array $headers;
 
+    /**
+     * Статус-коды успеха ответа сервера по этому роуту
+     * @var array
+     */
     protected array $successCodes = [];
 
+    /**
+     * @param array $routeData
+     */
     public function __construct(array $routeData)
     {
         $this->uri = $routeData['uri'];
@@ -22,6 +41,11 @@ class RouteConfig
         $this->successCodes = $routeData['success_codes'];
     }
 
+    /**
+     * @param string $attribute
+     * @return mixed
+     * @throws InvalidConfigException
+     */
     public function __get(string $attribute)
     {
         return property_exists($this, $attribute)
@@ -29,6 +53,11 @@ class RouteConfig
             : throw new InvalidConfigException('Не существующее свойство класса');
     }
 
+    /**
+     * @param string $targetAttribute
+     * @param mixed $targetValue
+     * @throws InvalidConfigException
+     */
     public function __set(string $targetAttribute, mixed $targetValue)
     {
         if (!property_exists($this, $targetAttribute))

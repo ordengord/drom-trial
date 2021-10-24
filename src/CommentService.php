@@ -64,7 +64,7 @@ class CommentService
     /**
      * @param array $commentData
      * @return CommentInterface
-     * @throws \CommentService\Exception\ServerRequestException
+     * @throws ServerResponseException
      */
     public function update(array $commentData): CommentInterface
     {

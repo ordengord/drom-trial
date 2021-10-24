@@ -10,10 +10,27 @@ use GuzzleHttp\Psr7\Response;
 
 class CommentRequest
 {
+    /**
+     * @var Client
+     */
     protected Client $client;
+
+    /**
+     * Настройки связанные с обращением к серверу
+     * @var ServerRequestConfig
+     */
     protected ServerRequestConfig $config;
+
+    /**
+     * Целевой урл (create/update/index)
+     * @var string
+     */
     protected string $targetRoute;
 
+    /**
+     * @param ServerRequestConfig $config
+     * @param string $targetRoute
+     */
     public function __construct(ServerRequestConfig $config, string $targetRoute)
     {
         $this->config = $config;
@@ -21,6 +38,12 @@ class CommentRequest
         $this->targetRoute = $targetRoute;
     }
 
+    /**
+     * Выполняет запрос на сервер
+     * @param array|null $bodyData
+     * @return Response
+     * @throws ServerRequestException
+     */
     public function execute(?array $bodyData = null): Response
     {
         $routeConfig = $this->config->route($this->targetRoute);
@@ -74,6 +97,9 @@ class CommentRequest
         return json_decode($response->getBody(), true);
     }
 
+    /**
+     * @param Client $client
+     */
     public function setClient(Client $client)
     {
         $this->client = $client;
