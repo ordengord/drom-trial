@@ -9,12 +9,12 @@ class CommentList
      */
     protected array $comments;
 
-    public function __construct(string $className, array $commentsData)
+    /**
+     * @param CommentInterface[] $comments
+     */
+    public function __construct(array $comments)
     {
-        foreach ($commentsData as $commentData) {
-            $comment = new $className($commentData);
-            $this->comments[] = $comment;
-        }
+        $this->comments = $comments;
     }
 
     //TODO тут могли бы быть методы для работы со списком комментариев - для пользователей библиотеки
