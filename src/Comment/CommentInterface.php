@@ -4,14 +4,7 @@ namespace CommentService\Comment;
 
 interface CommentInterface
 {
-    /**
-     * @param array $commentData
-     */
-    public function __construct(array $commentData);
-
     public function getId(): ?int;
-
-    public function setId(int $id): void;
 
     public function getName(): string;
 

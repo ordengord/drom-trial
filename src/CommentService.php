@@ -2,7 +2,9 @@
 
 namespace CommentService;
 
+use CommentService\Comment\BaseComment;
 use CommentService\Exception\ServerResponseException;
+use CommentService\Serializer\CommentSerializerInterface;
 use CommentService\ServerRequest\CommentRequest;
 use CommentService\Comment\CommentInterface;
 use CommentService\Comment\CommentList;
@@ -18,11 +20,13 @@ class CommentService
     public const UPDATE_ROUTE_NAME = 'update';
 
     protected Config $config;
+    private CommentSerializerInterface $serializer;
 
-    public function __construct(?array $config = null)
+    public function __construct(CommentSerializerInterface $serializer, ?array $config = null)
     {
         $config = $config ?: $this->withDefaultConfig();
         $this->config = new Config($config);
+        $this->serializer = $serializer;
     }
 
     protected function withDefaultConfig()
@@ -35,7 +39,6 @@ class CommentService
         $request = $this->createRequest(self::INDEX_ROUTE_NAME);
         $response = $request->execute();
         return new CommentList(
-            $this->config->comment()->className,
             $request->parseResponse($response)
         );
     }
@@ -48,17 +51,18 @@ class CommentService
      */
     public function create(array $commentData): CommentInterface
     {
-        $commentClassName = $this->config->comment()->className;
-        $comment = new $commentClassName($commentData);
+        $comment = new BaseComment($commentData['name'], $commentData['text'], $commentData['id'] ?? null);
 
         $request = $this->createRequest(self::CREATE_ROUTE_NAME);
-        $response = $request->execute( $comment->toRequestArray());
+        $response = $request->execute(
+            [
+                'comment' => $this->serializer->serialize($comment)
+            ]
+        );
 
-        $newCommentId = $request->parseResponse($response)['id'];
+        $newComment = $request->parseResponse($response);
 
-        $comment->setId($newCommentId);
-
-        return $comment;
+        return $newComment;
     }
 
     /**
@@ -68,8 +72,7 @@ class CommentService
      */
     public function update(array $commentData): CommentInterface
     {
-        $commentClassName = $this->config->comment()->className;
-        $comment = new $commentClassName($commentData);
+        $comment = new BaseComment($commentData['name'], $commentData['text'], $commentData['id']);
 
         $routeConfig = $this->config->server()->route(self::UPDATE_ROUTE_NAME);
         $routeConfig->uri = str_replace('{id}', $comment->getId(), $routeConfig->uri);
@@ -77,11 +80,15 @@ class CommentService
         $this->config->server()->setRouteConfig(self::UPDATE_ROUTE_NAME, $routeConfig);
 
         $request = $this->createRequest(self::UPDATE_ROUTE_NAME);
-        $response = $request->execute($comment->toRequestArray());
+        $response = $request->execute(
+            [
+                'comment' => $this->serializer->serialize($comment)
+            ]
+        );
 
-        return $request->parseResponse($response)
-            ? $comment
-            : throw new ServerResponseException();
+        $comment = $request->parseResponse($response);
+
+        return $comment;
     }
 
     /**
@@ -90,6 +97,6 @@ class CommentService
      */
     protected function createRequest(string $targetMethod): CommentRequest
     {
-        return new CommentRequest($this->config->server(), $targetMethod);
+        return new CommentRequest($this->config->server(), $targetMethod, $this->serializer);
     }
 }

@@ -2,8 +2,11 @@
 
 namespace CommentService\ServerRequest;
 
+use CommentService\Comment\CommentInterface;
+use CommentService\CommentService;
 use CommentService\Exception\ServerRequestException;
 use CommentService\Exception\ServerResponseException;
+use CommentService\Serializer\CommentSerializerInterface;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Psr7\Response;
@@ -21,6 +24,8 @@ class CommentRequest
      */
     protected ServerRequestConfig $config;
 
+    private CommentSerializerInterface $serializer;
+
     /**
      * Целевой урл (create/update/index)
      * @var string
@@ -31,11 +36,15 @@ class CommentRequest
      * @param ServerRequestConfig $config
      * @param string $targetRoute
      */
-    public function __construct(ServerRequestConfig $config, string $targetRoute)
-    {
+    public function __construct(
+        ServerRequestConfig $config,
+        string $targetRoute,
+        CommentSerializerInterface $serializer
+    ) {
         $this->config = $config;
         $this->client = new Client(['base_uri' => $this->config->getHost()]);
         $this->targetRoute = $targetRoute;
+        $this->serializer = $serializer;
     }
 
     /**
@@ -85,16 +94,20 @@ class CommentRequest
      * @param Response $response
      * @return array
      */
-    public function parseResponse(Response $response)
+    public function parseResponse(Response $response): CommentInterface
     {
         if (!in_array(
             $response->getStatusCode(),
             $this->config->route($this->targetRoute)->successCodes
-        ))
+        )) {
             throw new ServerResponseException();
+        }
 
-        //TODO Сервер может и не в json-е возращать
-        return json_decode($response->getBody(), true);
+        $stringBody = $response->getBody();
+
+        return $this->targetRoute === CommentService::INDEX_ROUTE_NAME
+            ? $this->serializer->deserializeArray($stringBody)
+            : $this->serializer->deserialize($stringBody);
     }
 
     /**

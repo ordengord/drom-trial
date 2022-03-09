@@ -1,6 +1,9 @@
 <?php
 
 use CommentService\CommentService;
+use CommentService\Serializer\CommentSerializerInterface;
+use CommentService\Serializer\JsonCommentSerializer;
+use CommentService\Serializer\XmlCommentSerializer;
 use CommentService\ServerRequest\CommentRequest;
 use GuzzleHttp\Psr7\Utils;
 use GuzzleHttp\Psr7\Response;
@@ -26,22 +29,22 @@ class CommentServiceTest extends TestCase
     /**
      * @dataProvider toCreate()
      */
-    public function testCreate($text, $name, $response, $arrayConfig)
+    public function testCreate($text, $name, $response, $arrayConfig, CommentSerializerInterface $serializer, string $contentType)
     {
         $config = new Config($arrayConfig);
-        $stream = Utils::streamFor(json_encode($response));
-        $fakeResponse = new Response(200, ['Content-Type' => 'application/json'], $stream);
+        $stream = Utils::streamFor($response);
+        $fakeResponse = new Response(200, ['Content-Type' => "application/$contentType"], $stream);
 
         $this->fakeClient->expects($this->once())
             ->method('request')
             ->will($this->returnValue($fakeResponse));
 
-        $commentRequest = new CommentRequest($config->server(), 'create');
+        $commentRequest = new CommentRequest($config->server(), 'create', $serializer);
 
         $commentRequest->setClient($this->fakeClient);
 
         $serviceMock = $this->getMockBuilder(CommentService::class)
-            ->setConstructorArgs([$arrayConfig])
+            ->setConstructorArgs([$serializer, $arrayConfig])
             ->onlyMethods(['createRequest'])
             ->getMock();
 
@@ -49,15 +52,37 @@ class CommentServiceTest extends TestCase
 
         $result = $serviceMock->create(['text' => $text, 'name' => $name]);
 
-        $this->assertEquals($result->getId(), $response['id']);
+        $this->assertEquals($result->getId(), $serializer->deserialize($response)->getId());
     }
 
     public function toCreate()
     {
+        $jsonResponseOne = json_encode([
+            'name' => 'name1',
+            'text' => 'text1',
+            'id' => 1,
+        ], true);
+
+        $xmlResponseTwo = <<<XML
+            <base-comment>
+                <name>
+                    name2
+                </name>
+                <text>
+                    text2
+                </text>
+                <id>
+                    2
+                </id>
+            </base-comment>
+        XML;
+
+        $jsonResponseThree = '{"name": "name3", "text": "text3", "id": 3}';
+
         return [
-            ['text1', 'name1', ['id' => 1], self::getConfig()],
-            ['text2', 'name2', ['id' => 2], self::getConfig()],
-            ['text3', 'name3', ['id' => 3], self::getConfig()]
+            ['text1', 'name1', $jsonResponseOne, self::getConfig(), new JsonCommentSerializer(), 'json'],
+            ['text2', 'name2', $xmlResponseTwo, self::getConfig(), new XmlCommentSerializer(), 'xml'],
+            ['text3', 'name3', $jsonResponseThree, self::getConfig(), new JsonCommentSerializer(), 'json']
         ];
     }
 
@@ -65,29 +90,29 @@ class CommentServiceTest extends TestCase
      * Изменяем текст комментария
      * @dataProvider toUpdate()
      */
-    public function testUpdate($commentData, $arrayConfig)
+    public function testUpdate($commentData, $response, $arrayConfig, CommentSerializerInterface $serializer, $contentType)
     {
         $config = new Config($arrayConfig);
-        $stream = Utils::streamFor('["OK"]'); // не имеет значения что вернет
-        $fakeResponse = new Response(200, ['Content-Type' => 'application/json'], $stream);
+        $stream = Utils::streamFor($response);
+        $fakeResponse = new Response(200, ['Content-Type' => "application/$contentType"], $stream);
 
         $this->fakeClient->expects($this->once())
             ->method('request')
             ->will($this->returnValue($fakeResponse));
 
-        $comment = new BaseComment($commentData);
+        $comment = new BaseComment($commentData['name'], $commentData['text'], $commentData['id']);
 
         $routeConfig = $config->server()->route('update');
         $routeConfig->uri = str_replace('{id}', $comment->getId(), $routeConfig->uri);
 
         $config->server()->setRouteConfig('update', $routeConfig);
 
-        $commentRequest = new CommentRequest($config->server(), 'update');
+        $commentRequest = new CommentRequest($config->server(), 'update', $serializer);
 
         $commentRequest->setClient($this->fakeClient);
 
         $serviceMock = $this->getMockBuilder(CommentService::class)
-            ->setConstructorArgs([$arrayConfig])
+            ->setConstructorArgs([$serializer, $arrayConfig])
             ->onlyMethods(['createRequest'])
             ->getMock();
 
@@ -103,32 +128,53 @@ class CommentServiceTest extends TestCase
 
     public function toUpdate()
     {
+        $jsonResponseOne = json_encode([
+            'name' => 'name1',
+            'text' => 'text111',
+            'id' => 1,
+        ], true);
+        $xmlResponseTwo = <<<XML
+            <base-comment>
+                <name>
+                    name2
+                </name>
+                <text>
+                    text222
+                </text>
+                <id>
+                    2
+                </id>
+            </base-comment>
+        XML;
+
+        $jsonResponseThree = '{"name": "name3", "text": "text333", "id": 3}';
+
         return [
-            [['text' => 'text111', 'name' => 'name1', 'id' => 1], self::getConfig()],
-            [['text' => 'text222', 'name' => 'name2', 'id' => 2], self::getConfig()],
-            [['text' => 'text333', 'name' => 'name3', 'id' => 3], self::getConfig()],
+            [['name' => 'name1', 'text' => 'text111', 'id' => 1], $jsonResponseOne, self::getConfig(), new JsonCommentSerializer(), 'json'],
+            [['name' => 'name2', 'text' => 'text222', 'id' => 2], $xmlResponseTwo, self::getConfig(), new XmlCommentSerializer(), 'xml'],
+            [['name' => 'name3', 'text' => 'text333', 'id' => 3], $jsonResponseThree, self::getConfig(), new JsonCommentSerializer(), 'json'],
         ];
     }
 
     /**
      * @dataProvider toIndex()
      */
-    public function testIndex($commentsFromServer, $arrayConfig)
+    public function testIndex($response, $arrayConfig, CommentSerializerInterface $serializer)
     {
         $config = new Config($arrayConfig);
-        $stream = Utils::streamFor(json_encode($commentsFromServer)); // не имеет значения что вернет
+        $stream = Utils::streamFor($response);
         $fakeResponse = new Response(200, ['Content-Type' => 'application/json'], $stream);
 
         $this->fakeClient->expects($this->once())
             ->method('request')
             ->will($this->returnValue($fakeResponse));
 
-        $commentRequest = new CommentRequest($config->server(), 'index');
+        $commentRequest = new CommentRequest($config->server(), 'index', $serializer);
 
         $commentRequest->setClient($this->fakeClient);
 
         $serviceMock = $this->getMockBuilder(CommentService::class)
-            ->setConstructorArgs([$arrayConfig])
+            ->setConstructorArgs([$serializer, $arrayConfig])
             ->onlyMethods(['createRequest'])
             ->getMock();
 
@@ -142,12 +188,53 @@ class CommentServiceTest extends TestCase
 
     public function toIndex()
     {
+        $xmlResponse = <<<XML
+            <base-comments>
+                <base-comment>
+                    <name>
+                        name1
+                    </name>
+                    <text>
+                        text111
+                    </text>
+                    <id>
+                        1
+                    </id>
+                </base-comment>
+                <base-comment>
+                    <name>
+                        name2
+                    </name>
+                    <text>
+                        text222
+                    </text>
+                    <id>
+                        2
+                    </id>
+                </base-comment>
+                <base-comment>
+                    <name>
+                        name3
+                    </name>
+                    <text>
+                        text333
+                    </text>
+                    <id>
+                        3
+                    </id>
+                </base-comment>
+            </base-comments>
+        XML;
+
+        $jsonResponse = json_encode([
+            ['name' => 'name1', 'text' => 'text111', 'id' => 1],
+            ['name' => 'name2', 'text' => 'text222', 'id' => 2],
+            ['name' => 'name3', 'text' => 'text333', 'id' => 3]
+        ], true);
+
         return [
-            [[
-                ['text' => 'text111', 'name' => 'name1', 'id' => 1],
-                ['text' => 'text222', 'name' => 'name2', 'id' => 2],
-                ['text' => 'text333', 'name' => 'name3', 'id' => 3]
-            ], self::getConfig()],
+            [$jsonResponse, self::getConfig(), new JsonCommentSerializer()],
+            [$xmlResponse, self::getConfig(), new XmlCommentSerializer()],
         ];
     }
 

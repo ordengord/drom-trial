@@ -19,7 +19,7 @@ class BaseComment implements CommentInterface
     /**
      * @var int|null
      */
-    protected ?int $id = null;
+    protected ?int $id;
 
     /**
      * @var string
@@ -31,32 +31,16 @@ class BaseComment implements CommentInterface
      */
     protected string $text;
 
-    /**
-     * @param array $commentData
-     * @throws CommentValidateException
-     */
-    public function __construct(array $commentData)
+    public function __construct(string $name, string $text, ?int $id = null)
     {
-        if ($this->isValid($commentData) === false)
-            throw new CommentValidateException();
-
-        $this->name = $commentData['name'];
-        $this->text = $commentData['text'];
-
-        if (array_key_exists('id', $commentData)) {
-            $this->id = $commentData['id'];
-        }
+        $this->name = trim($name);
+        $this->text = trim($text);
+        $this->id = $id;
     }
 
     public function getId(): ?int
     {
         return $this->id;
-    }
-
-
-    public function setId(int $id): void
-    {
-        $this->id = $id;
     }
 
     public function getName(): string
